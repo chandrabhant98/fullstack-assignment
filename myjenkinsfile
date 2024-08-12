@@ -1,1 +1,89 @@
 
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/chandrabhant98/fullstack-assignment.git'
+            }
+        }
+
+        stage('Build Next.js') {
+            steps {
+                dir('nextjs-app') {
+                    script {
+                        // Install dependencies
+                        sh 'npm install'
+                        // Build the application
+                        sh 'npm run build'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Next.js') {
+            steps {
+                dir('nextjs-app') {
+                    script {
+                        // Deploy commands
+                        // Example: Using Docker to deploy
+                        sh 'docker build -t nextjs-app .'
+                        sh 'docker run -d -p 3000:3000 nextjs-app'
+                    }
+                }
+            }
+        }
+
+        stage('Set Up Python Environment') {
+            steps {
+                dir('django-app') {
+                    script {
+                        // Set up Python virtual environment and install dependencies
+                        sh 'python3 -m venv venv'
+                        sh '. venv/bin/activate && pip install -r requirements.txt'
+                    }
+                }
+            }
+        }
+
+        stage('Migrate and Deploy Django') {
+            steps {
+                dir('django-app') {
+                    script {
+                        // Apply migrations and deploy Django application
+                        sh '. venv/bin/activate && python manage.py migrate'
+                        sh '. venv/bin/activate && python manage.py collectstatic --noinput'
+                        sh 'docker build -t django-app .'
+                        sh 'docker run -d -p 8000:8000 django-app'
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('nextjs-app') {
+                    script {
+                        // Run tests for Next.js
+                        sh 'npm test'
+                    }
+                }
+                dir('django-app') {
+                    script {
+                        // Run tests for Django
+                        sh '. venv/bin/activate && python manage.py test'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Archive build artifacts and test results
+            archiveArtifacts artifacts: '**/target/*.jar', allowEmptyArchive: true
+            junit '**/test-results/*.xml'
+        }
+    }
+}
